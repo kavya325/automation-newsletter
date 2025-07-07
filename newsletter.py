@@ -4,72 +4,81 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 
-# RSS feeds
-feeds = [
-    "https://www.mmh.com/rss/topic/11541",
-    "https://logisticsviewpoints.com/feed/",
+# Sender Gmail address
+sender_email = "siegerintern@gmail.com"
+
+# App Password from GitHub secret
+app_password = os.environ.get("APP_PASSWORD")
+
+# Recipients
+recipients = [sender_email]
+
+# Specialized RSS feeds
+rss_urls = [
     "https://www.parking.net/rss",
-    "https://www.textileworld.com/feed/"
+    "https://www.automation.com/rss-feeds/news",
+    "https://www.smartcitiesworld.net/rss/news",
+    "https://www.mmh.com/rss",
+    "https://www.supplychainquarterly.com/rss",
+    "https://www.textileworld.com/feed/",
+    "https://www.fibre2fashion.com/rss/news.aspx?type=industry"
 ]
 
 # Keywords to filter
 keywords = [
-    "automation",
-    "automated",
+    "car parking",
+    "automated parking",
+    "parking system",
     "warehouse automation",
-    "car parking automation",
-    "textile automation"
+    "automated warehouse",
+    "warehouse robotics",
+    "textile machinery",
+    "spinning machine",
+    "weaving",
+    "automation",
+    "logistics automation",
+    "storage solutions",
+    "robotic system"
 ]
 
-# Recipients
-recipients = [
-    "siegerintern@gmail.com",
-    "kavyaraj922@gmail.com"
-]
-
-# Sender credentials
-sender_email = os.environ["SENDER_EMAIL"]
-app_password = os.environ["APP_PASSWORD"]
-
-# Collect relevant articles
-articles = []
-
-for url in feeds:
-    feed = feedparser.parse(url)
-    for entry in feed.entries:
-        title = entry.title.lower()
-        summary = entry.summary.lower() if "summary" in entry else ""
-        if any(keyword in title or keyword in summary for keyword in keywords):
-            articles.append({
-                "title": entry.title,
-                "link": entry.link,
-                "published": entry.published if "published" in entry else "No date"
-            })
-
-if not articles:
-    print("No relevant articles found.")
-    exit()
-
-# Create HTML email
-html = """
-<h2>Daily Automation News Digest</h2>
+# Fetch and filter news
+html_content = """
+<h2>📰 Daily Industry Automation & Textile News</h2>
 <ul>
 """
-for article in articles:
-    html += f"<li><a href='{article['link']}'>{article['title']}</a> - {article['published']}</li>"
-html += "</ul>"
 
-# Email setup
-msg = MIMEMultipart("alternative")
-msg["Subject"] = "Daily Automation News Digest"
+filtered_count = 0
+
+for rss_url in rss_urls:
+    feed = feedparser.parse(rss_url)
+    for entry in feed.entries:
+        combined_text = (entry.title + entry.get("summary", "")).lower()
+        if any(keyword in combined_text for keyword in keywords):
+            html_content += f'<li><a href="{entry.link}">{entry.title}</a></li>'
+            filtered_count += 1
+
+html_content += "</ul>"
+
+if filtered_count == 0:
+    html_content += "<p>No relevant articles found today.</p>"
+
+html_content += "<hr><p>This is an automated email sent from GitHub Actions.</p>"
+
+# Compose email
+msg = MIMEMultipart()
 msg["From"] = sender_email
 msg["To"] = ", ".join(recipients)
-part = MIMEText(html, "html")
-msg.attach(part)
+msg["Subject"] = "Daily Automation & Textile Newsletter"
+
+msg.attach(MIMEText(html_content, "html"))
 
 # Send email
-with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+try:
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.starttls()
     server.login(sender_email, app_password)
     server.sendmail(sender_email, recipients, msg.as_string())
-
-print("Newsletter sent successfully.")
+    server.quit()
+    print("✅ Filtered newsletter sent successfully!")
+except Exception as e:
+    print("❌ Error:", e)
